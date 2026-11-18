@@ -1,10 +1,18 @@
 """Optional online smoke test: real published GitHub package, disposable installation only."""
 from pathlib import Path
-import tempfile,shutil,subprocess,os,secrets,json,urllib.request,urllib.error,http.cookiejar,socket,time,signal,sqlite3
+import tempfile,shutil,subprocess,os,secrets,json,urllib.request,urllib.error,http.cookiejar,socket,time,signal,sqlite3,zipfile
 SRC=Path(__file__).resolve().parents[1];work=Path(tempfile.mkdtemp(prefix='pereplet-github-test-'));root=work/'site'
-shutil.copytree(SRC,root,ignore=shutil.ignore_patterns('data','uploads','.git','__pycache__'))
+bootstrap=os.environ.get('QUIZ_BOOTSTRAP_ARCHIVE')
+if bootstrap:
+ root.mkdir()
+ with zipfile.ZipFile(bootstrap) as archive:
+  for name in archive.namelist():
+   if name.startswith('quiz-library/') and not name.endswith('/'):
+    target=root/name[13:];target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(archive.read(name))
+ shutil.copy2(SRC/'server/updater.php',root/'server/updater.php')
+else:shutil.copytree(SRC,root,ignore=shutil.ignore_patterns('data','uploads','.git','__pycache__'))
 (root/'data').mkdir();(root/'uploads').mkdir();(root/'uploads/retained.png').write_bytes(b'unchanged-media')
-v=json.loads((root/'version.json').read_text());v['version']='0.9.0';(root/'version.json').write_text(json.dumps(v))
+v=json.loads((root/'version.json').read_text());baseline=v['version'] if bootstrap else '0.9.0';v['version']=baseline;(root/'version.json').write_text(json.dumps(v))
 (root/'assets/pre-online-update.js').write_text('// old fixture code\n')
 password=secrets.token_urlsafe(24);subprocess.run(['php',str(root/'server/setup.php')],input=password+'\n',text=True,check=True,stdout=subprocess.DEVNULL)
 with socket.socket() as s:s.bind(('127.0.0.1',0));port=s.getsockname()[1]
@@ -29,7 +37,7 @@ try:
  result=h.call('update_install',{'version':target});assert result['version']==target,result
  assert h.call('update_status')['version']==target;assert before==rows();assert not (root/'assets/pre-online-update.js').exists();assert (root/'uploads/retained.png').read_bytes()==b'unchanged-media'
  assert h.call('monitor&run='+run)['teams'][0]['score']==1
- h.call('settings',{'venue':'После обновления','registration':True,'feedback':True,'maxTeams':100});after=rows();status=h.call('update_status');assert status['rollback']['version']=='0.9.0'
- h.call('update_rollback',{'id':status['rollback']['id']});assert h.call('update_status')['version']=='0.9.0';assert after==rows();assert (root/'assets/pre-online-update.js').exists()
- print('PASS: real GitHub release '+target+' downloaded, digest/manifest/lint verified, installed via host API, snapshot retained questions/password/answers/media, rollback retained post-install edits. Artifacts:',work)
+ h.call('settings',{'venue':'После обновления','registration':True,'feedback':True,'maxTeams':100});after=rows();status=h.call('update_status');assert status['rollback']['version']==baseline
+ h.call('update_rollback',{'id':status['rollback']['id']});assert h.call('update_status')['version']==baseline;assert after==rows();assert (root/'assets/pre-online-update.js').exists()
+ print('PASS: '+('one-file bootstrap from '+baseline+'; ' if bootstrap else '')+'real GitHub release '+target+' downloaded, digest/manifest/lint verified, installed via host API, snapshot retained questions/password/answers/media, rollback retained post-install edits. Artifacts:',work)
 finally:os.killpg(p.pid,signal.SIGTERM);p.wait(timeout=10);log.close()

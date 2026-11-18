@@ -186,25 +186,116 @@ function up_files(): array
     sort($out);
     return $out;
 }
-function up_php(): string
+function up_runtime(): array
 {
-    foreach (
-        [PHP_BINDIR . "/php.exe", PHP_BINDIR . "/php", PHP_BINARY]
-        as $path
-    ) {
+    return [
+        "ini" => php_ini_loaded_file() ?: "",
+        "binary" => PHP_BINARY,
+        "bindir" => PHP_BINDIR,
+        "root" => realpath(ROOT) ?: ROOT,
+        "extension_dir" => (string) ini_get("extension_dir"),
+        "sapi" => PHP_SAPI,
+        "version" => PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION,
+        "windows" => DIRECTORY_SEPARATOR === "\\",
+    ];
+}
+// Runtime paths, not PATH or compile-time PHP_BINDIR alone. Pure helper for Windows tests.
+function up_php_candidates(array $runtime): array
+{
+    $paths = [];
+    $normal = fn(string $path): string => str_replace("\\", "/", $path);
+    $add = function (string $dir) use (&$paths, $normal, $runtime): void {
+        if ($dir === "" || $dir === ".") {
+            return;
+        }
+        $dir = rtrim($normal($dir), "/");
+        $paths[] = $dir . "/php.exe";
+        if (!($runtime["windows"] ?? false)) {
+            $paths[] = $dir . "/php" . ($runtime["version"] ?? "");
+            $paths[] = $dir . "/php";
+        }
+    };
+    $ini = $normal($runtime["ini"] ?? "");
+    $binary = $normal($runtime["binary"] ?? "");
+    if (($runtime["sapi"] ?? "") === "cli" && $binary !== "") {
+        $paths[] = $binary;
+    }
+    if ($ini !== "") {
+        $add(dirname($ini));
+    }
+    $extension = $normal($runtime["extension_dir"] ?? "");
+    if (preg_match("~^(?:[a-zA-Z]:/|/)~", $extension)) {
+        $add(dirname($extension));
+    }
+    if ($binary !== "") {
+        $add(dirname($binary));
+        // Apache in XAMPP: <xampp>/apache/bin/httpd.exe; PHP: <xampp>/php/php.exe.
+        $add(dirname(dirname($binary), 2) . "/php");
+        $paths[] = $binary;
+    }
+    $root = $normal($runtime["root"] ?? "");
+    if ($root !== "") {
+        for ($dir = $root, $n = 0; $n < 5; $n++) {
+            $add($dir . "/php");
+            $parent = dirname($dir);
+            if ($parent === $dir) {
+                break;
+            }
+            $dir = $parent;
+        };
+    }
+    $add($runtime["bindir"] ?? "");
+    if ($runtime["windows"] ?? false) {
+        $add("C:/xampp/php");
+    }
+    return array_values(array_unique($paths));
+}
+function up_choose_php(array $paths, ?callable $exists = null): string
+{
+    $exists ??= "is_file";
+    foreach ($paths as $path) {
         if (
-            is_file($path) &&
             preg_match(
                 '/^php(?:\d+(?:\.\d+)*)?(?:\.exe)?$/i',
                 basename(str_replace("\\", "/", $path)),
-            )
+            ) &&
+            $exists($path)
         ) {
             return $path;
         }
     }
     throw new RuntimeException(
-        "Не найден php.exe для проверки обновления. Проверьте установку XAMPP.",
+        "Не найден php.exe для проверки обновления. Проверьте, что он есть рядом с загруженным php.ini в папке PHP XAMPP.",
     );
+}
+function up_php(): string
+{
+    return up_choose_php(up_php_candidates(up_runtime()));
+}
+function up_environment(): string
+{
+    $ini = php_ini_loaded_file() ?: "";
+    if ($ini !== "") {
+        clearstatcache(true, $ini);
+    }
+    return hash(
+        "sha256",
+        json_encode(
+            [
+                "runtime" => up_runtime(),
+                "ini_mtime" => $ini !== "" ? @filemtime($ini) : null,
+                "curl" => extension_loaded("curl"),
+                "zip" => extension_loaded("zip"),
+                "proc_open" => function_exists("proc_open"),
+            ],
+            JSON_THROW_ON_ERROR,
+        ),
+    );
+}
+function up_cached_check(): array
+{
+    $cache = up_json(up_dir() . "/check.json");
+    return ($cache["environment"] ?? "") === up_environment() ? $cache : [];
 }
 function up_run(array $args): void
 {
@@ -212,15 +303,22 @@ function up_run(array $args): void
         throw new RuntimeException("Для обновлений включите proc_open в PHP.");
     }
     $log = up_dir() . "/health-" . bin2hex(random_bytes(6)) . ".log";
+    $binary = up_php();
+    $command = [$binary];
+    $ini = php_ini_loaded_file();
+    if ($ini !== false && is_file($ini)) {
+        array_push($command, "-c", $ini);
+    }
+    array_push($command, "-d", "opcache.enable_cli=0", ...$args);
     $p = proc_open(
-        [up_php(), "-d", "opcache.enable_cli=0", ...$args],
+        $command,
         [
             0 => ["pipe", "r"],
             1 => ["file", $log, "w"],
             2 => ["file", $log, "a"],
         ],
         $pipes,
-        ROOT,
+        dirname($binary),
         null,
         ["bypass_shell" => true],
     );
@@ -437,7 +535,7 @@ function up_check(bool $force = false): array
 {
     $dir = up_dir();
     $settings = up_settings();
-    $cache = up_json($dir . "/check.json");
+    $cache = up_cached_check();
     $lock = fopen($dir . "/check.lock", "c+");
     if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
         return $cache;
@@ -453,6 +551,7 @@ function up_check(bool $force = false): array
         $value = [
             "repository" => $settings["repository"],
             "checked" => time(),
+            "environment" => up_environment(),
             "release" => null,
             "error" => null,
         ];
@@ -497,7 +596,7 @@ function up_check(bool $force = false): array
 function up_status(): array
 {
     $state = up_json(up_dir() . "/state.json");
-    $cache = up_json(up_dir() . "/check.json");
+    $cache = up_cached_check();
     $release = $cache["release"] ?? null;
     if ($release) {
         unset($release["download"], $release["sha256"]);

@@ -20,6 +20,7 @@ try:
  for f in [*SRC.glob('*.php'),*(SRC/'server').glob('*.php')]:subprocess.run(['php','-l',str(f)],check=True,stdout=subprocess.DEVNULL)
  for f in (SRC/'assets').glob('*.js'):subprocess.run(['node','--check',str(f)],check=True)
  subprocess.run(['python3',str(SRC/'tests/updater.py')],check=True)
+ subprocess.run(['python3',str(SRC/'tests/php-discovery.py')],check=True)
  print('ALL CHECKS PASSED; disposable artifacts:',work)
 finally:
  os.killpg(p.pid,signal.SIGTERM);p.wait(timeout=10);log.close()
