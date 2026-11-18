@@ -31,7 +31,11 @@ try:
  for _ in range(100):
   try:urllib.request.urlopen(URL,timeout=1).close();break
   except OSError:time.sleep(.1)
- h=Client();h.call('login',{'password':password});q=h.call('quizzes')['quizzes'][0];run=h.call('activate',{'id':q['id']})['id'];g=Client();g.token=g.call('join',{'name':'До обновления'})['token'];g.call('answer',{'run':run,'question':'q1','value':[1],'final':True});h.call('stop',{})
+ h=Client();h.call('login',{'password':password})
+ if bootstrap:
+  cache=root/'data/updater/check.json';cache.parent.mkdir(exist_ok=True);cache.write_text(json.dumps({'repository':'Zarvad23/quiz-library','checked':int(time.time()),'error':'Включите extension=curl в php.ini и перезапустите Apache.','release':None}))
+  status=h.call('update_status');assert status['version']==baseline and status['check']['error'] is None and status['check']['checked'] is None,status
+ q=h.call('quizzes')['quizzes'][0];run=h.call('activate',{'id':q['id']})['id'];g=Client();g.token=g.call('join',{'name':'До обновления'})['token'];g.call('answer',{'run':run,'question':'q1','value':[1],'final':True});h.call('stop',{})
  before=rows();check=h.call('update_check',{'force':True});assert check['check']['error'] is None,check
  target=check['check']['release']['version'];assert target==json.loads((SRC/'version.json').read_text())['version'],check
  result=h.call('update_install',{'version':target});assert result['version']==target,result
