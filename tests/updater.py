@@ -6,6 +6,8 @@ subprocess.run(['python3',str(SRC/'tools/build-release.py'),str(WORK/'base.zip')
 with zipfile.ZipFile(WORK/'base.zip') as z:
  for n in z.namelist():
   if n!='quiz-library/update-manifest.json':z.extract(n,WORK)
+# The fixture represents a previous compatible installation, independent of the release version.
+(ROOT/'version.json').write_text(json.dumps({'version':'1.0.0','data_format':1,'updater_protocol':1,'min_php':'8.1.0'}))
 (ROOT/'data').mkdir();(ROOT/'uploads').mkdir();(ROOT/'data/.htaccess').write_text('Require all denied\n')
 password='test-'+os.urandom(16).hex();subprocess.run(['php',str(ROOT/'server/setup.php')],input=password+'\n',text=True,check=True,stdout=subprocess.DEVNULL)
 (ROOT/'uploads/retained.png').write_bytes(b'unchanged-user-media')

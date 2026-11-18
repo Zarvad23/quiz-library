@@ -356,7 +356,7 @@ function up_http(string $url, ?string $destination = null): array
         ]);
         $ok = curl_exec($ch);
         $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
-        curl_close($ch);
+        unset($ch);
         if ($file) {
             fclose($file);
         }

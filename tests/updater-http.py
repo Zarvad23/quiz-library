@@ -1,5 +1,6 @@
 """Updater API permissions against a disposable server; never downloads a release."""
 import os,json,urllib.request,urllib.error,http.cookiejar
+from pathlib import Path
 URL=os.environ['QUIZ_TEST_URL'];PASSWORD=open(os.environ['QUIZ_TEST_PASSWORD_FILE']).read().strip()
 class Client:
  def __init__(self):
@@ -15,7 +16,7 @@ h=Client();g=Client()
 g.call('update_status',status=401)
 for action in ['update_config','update_check','update_install','update_rollback']:
  g.call(action,{},status=401);g.call(action,{},status=403,csrf='forged');g.call(action,status=405)
-h.call('login',{'password':PASSWORD});u=h.call('update_status');assert u['version']=='1.0.0' and not u['requirements']
+h.call('login',{'password':PASSWORD});u=h.call('update_status');assert u['version']==json.loads((Path(__file__).resolve().parents[1]/'version.json').read_text())['version'] and not u['requirements']
 h.call('update_config',{'repository':'https://github.com/owner/repo','automatic':False,'password':'wrong'},400)
 u=h.call('update_config',{'repository':'https://github.com/owner/repo','automatic':False,'password':PASSWORD});assert u['settings']=={'repository':'owner/repo','automatic':False}
 for repo in ['http://localhost/path','https://127.0.0.1','owner/repo/../../other','owner/repo?x=1','x\n/repo']:
