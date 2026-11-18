@@ -21,6 +21,7 @@ try:
  for f in (SRC/'assets').glob('*.js'):subprocess.run(['node','--check',str(f)],check=True)
  subprocess.run(['python3',str(SRC/'tests/updater.py')],check=True)
  subprocess.run(['python3',str(SRC/'tests/php-discovery.py')],check=True)
+ subprocess.run(['python3',str(SRC/'tests/release-screenshots.py')],check=True)
  print('ALL CHECKS PASSED; disposable artifacts:',work)
 finally:
  os.killpg(p.pid,signal.SIGTERM);p.wait(timeout=10);log.close()

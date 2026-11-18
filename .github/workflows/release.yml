@@ -48,4 +48,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create "$RELEASE_TAG" "$RUNNER_TEMP/quiz-library-update.zip" --verify-tag --title "Переплёт $RELEASE_TAG" --notes-file docs/RELEASE-NOTES.md
+        run: python3 tools/publish-release.py "$RELEASE_TAG" "$RUNNER_TEMP/quiz-library-update.zip"

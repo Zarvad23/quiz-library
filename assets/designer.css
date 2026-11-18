@@ -1000,3 +1000,133 @@ select {
     padding: 18px;
   }
 }
+
+.release-screenshots {
+  margin: 24px 0;
+}
+.release-screenshots h4 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.release-screenshot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.release-screenshot {
+  padding: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: #193c32;
+  border: 1px solid #d4dece;
+  border-radius: 12px;
+  text-align: left;
+  background: #fff;
+  cursor: pointer;
+}
+.release-screenshot:hover {
+  border-color: #376d56;
+}
+.release-screenshot:focus-visible {
+  outline: 3px solid #376d56;
+  outline-offset: 3px;
+}
+.release-screenshot-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16/10;
+  background: #eef2e9;
+}
+.release-screenshot-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+.release-screenshot-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.release-image-number {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 3px 8px;
+  background: #163c32;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.release-image-error {
+  color: #6d6250;
+  font-size: 14px;
+  text-align: center;
+  padding: 20px;
+}
+.release-image-error[hidden],
+.release-screenshot-preview img[hidden],
+.release-viewer-image img[hidden] {
+  display: none;
+}
+dialog.release-screenshot-dialog {
+  width: min(1180px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  padding: 24px;
+}
+.release-viewer-heading {
+  padding-right: 32px;
+}
+.release-viewer-heading > span {
+  font-size: 13px;
+  color: #62725e;
+}
+.release-viewer-heading h2 {
+  margin: 6px 0 18px;
+  font-size: 25px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.release-viewer-image {
+  display: grid;
+  place-items: center;
+  background: #eef2e9;
+  border-radius: 8px;
+  min-height: 160px;
+}
+.release-viewer-image img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100dvh - 240px);
+  object-fit: contain;
+}
+.release-viewer-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+@media (max-width: 600px) {
+  .release-screenshot-grid {
+    grid-template-columns: 1fr;
+  }
+  dialog.release-screenshot-dialog {
+    padding: 18px;
+  }
+  .release-viewer-heading h2 {
+    font-size: 21px;
+  }
+  .release-viewer-nav .btn {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+}

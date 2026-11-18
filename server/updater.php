@@ -242,7 +242,7 @@ function up_php_candidates(array $runtime): array
                 break;
             }
             $dir = $parent;
-        };
+        }
     }
     $add($runtime["bindir"] ?? "");
     if ($runtime["windows"] ?? false) {
@@ -283,6 +283,7 @@ function up_environment(): string
         json_encode(
             [
                 "runtime" => up_runtime(),
+                "release_format" => 2,
                 "ini_mtime" => $ini !== "" ? @filemtime($ini) : null,
                 "curl" => extension_loaded("curl"),
                 "zip" => extension_loaded("zip"),
@@ -471,6 +472,60 @@ function up_http(string $url, ?string $destination = null): array
     }
     throw new RuntimeException("Слишком много перенаправлений GitHub.");
 }
+function up_release_screenshots(array $assets, string $repo): array
+{
+    $images = [];
+    foreach ($assets as $asset) {
+        if (
+            !is_array($asset) ||
+            !preg_match(
+                '/^screenshot-(\d{2})(?:-[a-z0-9_-]+)?\.(?:png|jpe?g|webp|gif)$/iD',
+                $asset["name"] ?? "",
+                $number,
+            )
+        ) {
+            continue;
+        }
+        $url = $asset["browser_download_url"] ?? "";
+        if (
+            !is_string($url) ||
+            !str_starts_with(
+                $url,
+                "https://github.com/" . $repo . "/releases/download/",
+            ) ||
+            ($asset["state"] ?? "") !== "uploaded" ||
+            ($asset["size"] ?? 0) < 1 ||
+            $asset["size"] > 8388608
+        ) {
+            continue;
+        }
+        try {
+            up_url($url);
+        } catch (Throwable $e) {
+            continue;
+        }
+        if (isset($images[$url])) {
+            continue;
+        }
+        $label = is_string($asset["label"] ?? null)
+            ? trim($asset["label"])
+            : "";
+        $images[$url] = [
+            "name" => $asset["name"],
+            "url" => $url,
+            "caption" => mb_substr(
+                $label !== "" ? $label : "Скриншот " . (int) $number[1],
+                0,
+                160,
+            ),
+        ];
+    }
+    usort($images, fn($a, $b) => strnatcasecmp($a["name"], $b["name"]));
+    return array_map(
+        fn($image) => ["url" => $image["url"], "caption" => $image["caption"]],
+        array_slice($images, 0, 8),
+    );
+}
 function up_release(array $raw, string $repo): array
 {
     if (
@@ -526,6 +581,10 @@ function up_release(array $raw, string $repo): array
                     "/releases/tag/" .
                     rawurlencode($raw["tag_name"]),
                 "notes" => mb_substr((string) ($raw["body"] ?? ""), 0, 6000),
+                "screenshots" => up_release_screenshots(
+                    $raw["assets"] ?? [],
+                    $repo,
+                ),
             ];
         }
     }
